@@ -1,19 +1,20 @@
 package authentication
 
 import (
-	"github.com/leo-backend/core/redis"
-	"github.com/leo-backend/services/models"
-	"github.com/leo-backend/settings"
 	"bufio"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"github.com/bobintornado/boltdb-boilerplate"
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/leo-backend/core/redis"
+	"github.com/leo-backend/services/models"
+	"github.com/leo-backend/settings"
 	"golang.org/x/crypto/bcrypt"
 	"os"
 	"time"
-	"github.com/bobintornado/boltdb-boilerplate"
 )
+
 // TODO change this all to bolt db
 type JWTAuthenticationBackend struct {
 	privateKey *rsa.PrivateKey
@@ -46,7 +47,7 @@ func (backend *JWTAuthenticationBackend) GenerateToken(userUUID string) (string,
 		"sub": userUUID,
 	}
 
-	// 
+	//
 	tokenString, err := token.SignedString(backend.privateKey)
 	if err != nil {
 		panic(err)
@@ -96,7 +97,6 @@ func (backend *JWTAuthenticationBackend) RegisterUser(user *models.User) error {
 	return nil
 }
 
-
 func getPrivateKey() *rsa.PrivateKey {
 	privateKeyFile, err := os.Open(settings.Get().PrivateKeyPath)
 	if err != nil {
@@ -115,13 +115,16 @@ func getPrivateKey() *rsa.PrivateKey {
 	privateKeyFile.Close()
 
 	// There is something going wrong in this line, trying to figure it out
-	privateKeyImported, err := x509.ParsePKCS1PrivateKey(data.Bytes)
+	privateKeyImported, err := x509.ParsePKCS8PrivateKey(data.Bytes)
 
 	if err != nil {
 		panic(err)
 	}
-
-	return privateKeyImported
+	rsa, ok := privateKeyImported.(*rsa.PrivateKey)
+	if !ok {
+		panic(ok)
+	}
+	return rsa
 }
 
 func getPublicKey() *rsa.PublicKey {

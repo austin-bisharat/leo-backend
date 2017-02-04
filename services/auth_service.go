@@ -1,12 +1,13 @@
 package services
 
 import (
-	"github.com/leo-backend/api/parameters"
-	"github.com/leo-backend/core/authentication"
-	"github.com/leo-backend/services/models"
 	"encoding/json"
 	jwt "github.com/dgrijalva/jwt-go"
 	request "github.com/dgrijalva/jwt-go/request"
+	"github.com/leo-backend/api/parameters"
+	"github.com/leo-backend/core/authentication"
+	"github.com/leo-backend/log"
+	"github.com/leo-backend/services/models"
 	"net/http"
 )
 
@@ -54,7 +55,7 @@ func Logout(req *http.Request) error {
 func GetUser(requestUser *models.User) (int, []byte) {
 	authBackend := authentication.InitJWTAuthenticationBackend()
 	if authBackend.GetUser(requestUser) != nil {
-		// at this point we have 
+		// at this point we have
 		token, err := authBackend.GenerateToken(requestUser.UUID)
 		if err != nil {
 			return http.StatusInternalServerError, []byte("")
@@ -69,13 +70,14 @@ func GetUser(requestUser *models.User) (int, []byte) {
 func Register(requestUser *models.User) (int, []byte) {
 	authBackend := authentication.InitJWTAuthenticationBackend()
 	if authBackend.RegisterUser(requestUser) != nil {
-		// token, err := authBackend.GenerateToken(requestUser.UUID)
-		// if err != nil {
-		// 	return http.StatusInternalServerError, []byte("")
-		// } else {
-			// response, _ := json.Marshal(parameters. {token})
-			return http.StatusOK, []byte{0}
-		// }
+		token, err := authBackend.GenerateToken(requestUser.UUID)
+		if err != nil {
+			return http.StatusInternalServerError, []byte("")
+		} else {
+			log.Debug("here")
+			response, _ := json.Marshal(parameters.TokenAuthentication{token})
+			return http.StatusOK, response
+		}
 	}
 	return http.StatusUnauthorized, []byte("")
 }
