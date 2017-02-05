@@ -9,6 +9,7 @@ import (
 	"github.com/leo-backend/services/models"
 	"log"
 	"net/http"
+	"fmt"
 )
 
 func Login(requestUser *models.User) (int, []byte) {
@@ -40,16 +41,20 @@ func RefreshToken(requestUser *models.User) []byte {
 	return response
 }
 
-func Logout(req *http.Request) error {
+// TODO maybe add a []byte to the response
+func Logout(requestUser *models.User, req *http.Request) int {
 	authBackend := backend.InitJWTAuthenticationBackend()
-	tokenRequest, err := request.ParseFromRequest(req, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {
-		return authBackend.PublicKey, nil
-	})
+	tokenString, err := requireAuth(requestUser, req)
 	if err != nil {
-		return err
+		return http.StatusUnauthorized
 	}
-	tokenString := req.Header.Get("Authorization")
-	return authBackend.Logout(tokenString, tokenRequest)
+
+	err = authBackend.Logout(requestUser, tokenString)
+	if err != nil {
+		return http.StatusInternalServerError
+	}
+
+	return http.StatusOK
 }
 
 func GetUser(requestUser *models.User) (int, []byte) {
@@ -84,5 +89,25 @@ func CreateUser(requestUser *models.User) (int, []byte) {
 	response, _ := json.Marshal(parameters.TokenAuthentication{token})
 	log.Println("Successfully registered user.")
 	return http.StatusOK, response
+}
 
+// private method for requiring auth
+func requireAuth(requestUser *models.User, req *http.Request) (string, error) {
+	authBackend := backend.InitJWTAuthenticationBackend()
+	log.Println("Trying to verify token")
+	token, err := request.ParseFromRequest(req, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		} else {
+			return authBackend.PublicKey, nil
+		}
+	})
+	log.Println("Obtained token")
+	log.Println(token.Valid)
+	if err != nil || !token.Valid {
+		return "", err
+	}
+	tokenString := req.Header.Get("Authorization")
+	log.Println("Checking if token is in db.")
+	return tokenString, authBackend.RequireTokenAuthentication(requestUser, tokenString)
 }

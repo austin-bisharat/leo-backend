@@ -49,6 +49,11 @@ func InitDB() error {
 		if err != nil {
 			return fmt.Errorf("create bucket: %s", err)
 		}
+		_, err = tx.CreateBucket([]byte("tokens")) // username => token
+		if err != nil {
+			return fmt.Errorf("create bucket: %s", err)
+		}
+		log.Println("Added tokens bucket to db")
 
 		return nil
 	})
@@ -84,30 +89,56 @@ func (backend *JWTAuthenticationBackend) GenerateToken(userUUID string) (string,
 		panic(err)
 		return "", err
 	}
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("tokens"))
+		err := b.Put([]byte(userUUID), []byte(tokenString))
+		if err != nil {
+			return errors.New("User already exists")
+		}
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
 	return tokenString, nil
 }
 
 func (backend *JWTAuthenticationBackend) Authenticate(user *models.User) bool {
 	// Obtain hashed password from DB
-	value := []byte("") //boltdbboilerplate.Get([]byte("userpassword"), []byte(user.Username))
-	// https://godoc.org/golang.org/x/crypto/bcrypt
-	return bcrypt.CompareHashAndPassword(value, []byte(user.Password)) == nil
-}
-
-func (backend *JWTAuthenticationBackend) getTokenRemainingValidity(timestamp interface{}) int {
-	if validity, ok := timestamp.(float64); ok {
-		tm := time.Unix(int64(validity), 0)
-		remainer := tm.Sub(time.Now())
-		if remainer > 0 {
-			return int(remainer.Seconds() + expireOffset)
+	var hashedPassword []byte
+	log.Println("Autheticating user.")
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("userpassword"))
+		v := b.Get([]byte(user.Username))
+		if v == nil {
+			return errors.New("User does not exist, create user first.")
 		}
+		log.Println("Obtained user!")
+		hashedPassword = v
+		return nil
+	})
+	if err != nil {
+		return false
 	}
-	return expireOffset
+	return bcrypt.CompareHashAndPassword(hashedPassword, []byte(user.Password)) == nil
+	
 }
 
-func (backend *JWTAuthenticationBackend) Logout(tokenString string, token *jwt.Token) error {
-	// TODO more backend stuff
-	return nil
+func (backend *JWTAuthenticationBackend) Logout(user *models.User, tokenString string) error {
+	// Deletes token from DB
+	err := db.Update(func(tx *bolt.Tx) error {
+		log.Println("Trying to delete token")
+		b := tx.Bucket([]byte("tokens"))
+		err := b.Delete([]byte(user.UUID))
+		log.Println(err)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	return err;
 }
 
 func (backend *JWTAuthenticationBackend) GetUser(user *models.User) []byte {
@@ -119,11 +150,15 @@ func (backend *JWTAuthenticationBackend) CreateUser(user *models.User) error {
 	// TODO this conversion may be incorrect
 	byteArray := []byte(user.Password)
 	log.Println(user.Password)
-	res, err := bcrypt.GenerateFromPassword(byteArray, 100)
-
+	res, err := bcrypt.GenerateFromPassword(byteArray, 4)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("userpassword"))
 		v := b.Get([]byte(user.Username))
+		log.Println(v)
 		if v != nil {
 			return errors.New("User already exists")
 		}
@@ -137,6 +172,27 @@ func (backend *JWTAuthenticationBackend) CreateUser(user *models.User) error {
 	log.Println("Registered user")
 	return nil
 }
+
+func (backend *JWTAuthenticationBackend) RequireTokenAuthentication(user *models.User, tokenString string) error {
+
+	var storedToken []byte
+
+	err := db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte("tokens"))
+			v := b.Get([]byte(user.UUID))
+			storedToken = v
+			return nil
+		})
+	if tokenString != string(storedToken) {
+		return fmt.Errorf("User is not logged in. Sign in again to perform that action.")
+	}
+	log.Println(storedToken)
+	if storedToken == nil || err != nil {
+		return fmt.Errorf("User is not logged in. Sign in again to perform that action.")
+	} 
+	return nil
+}
+
 
 func getPrivateKey() *rsa.PrivateKey {
 	privateKeyFile, err := os.Open(settings.Get().PrivateKeyPath)
