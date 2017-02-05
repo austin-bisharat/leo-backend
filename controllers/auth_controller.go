@@ -1,9 +1,9 @@
 package controllers
 
 import (
+	"encoding/json"
 	"github.com/leo-backend/services"
 	"github.com/leo-backend/services/models"
-	"encoding/json"
 	"net/http"
 )
 
@@ -53,12 +53,12 @@ func Update(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 
 }
 
-func Register(w http.ResponseWriter, r *http.Request) {
+func CreateUser(w http.ResponseWriter, r *http.Request) {
 	requestUser := new(models.User)
 	decoder := json.NewDecoder(r.Body)
 	decoder.Decode(&requestUser)
 
-	responseStatus, token := services.Register(requestUser)
+	responseStatus, token := services.CreateUser(requestUser)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(responseStatus)
 	w.Write(token)

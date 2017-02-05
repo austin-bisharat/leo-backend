@@ -1,18 +1,19 @@
-package authentication
+package backend
 
 import (
 	"bufio"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"github.com/bobintornado/boltdb-boilerplate"
+	"errors"
+	"fmt"
+	"github.com/boltdb/bolt"
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/leo-backend/core/redis"
 	"github.com/leo-backend/services/models"
 	"github.com/leo-backend/settings"
 	"golang.org/x/crypto/bcrypt"
-	"os"
 	"log"
+	"os"
 	"time"
 )
 
@@ -28,6 +29,35 @@ const (
 )
 
 var authBackendInstance *JWTAuthenticationBackend = nil
+
+var db *bolt.DB = nil
+
+func InitDB() error {
+	newDB, err := bolt.Open("leo.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+	db = newDB
+	if err != nil {
+		panic("Cannot open db")
+		return err
+	}
+
+	db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucket([]byte("userpassword"))
+		if err != nil {
+			return fmt.Errorf("create bucket: %s", err)
+		}
+		_, err = tx.CreateBucket([]byte("ipaddress"))
+		if err != nil {
+			return fmt.Errorf("create bucket: %s", err)
+		}
+
+		return nil
+	})
+	return nil
+}
+
+func CloseDB() {
+	db.Close()
+}
 
 func InitJWTAuthenticationBackend() *JWTAuthenticationBackend {
 	if authBackendInstance == nil {
@@ -59,7 +89,7 @@ func (backend *JWTAuthenticationBackend) GenerateToken(userUUID string) (string,
 
 func (backend *JWTAuthenticationBackend) Authenticate(user *models.User) bool {
 	// Obtain hashed password from DB
-	value := boltdbboilerplate.Get([]byte("userpassword"), []byte(user.Username))
+	value := []byte("") //boltdbboilerplate.Get([]byte("userpassword"), []byte(user.Username))
 	// https://godoc.org/golang.org/x/crypto/bcrypt
 	return bcrypt.CompareHashAndPassword(value, []byte(user.Password)) == nil
 }
@@ -76,23 +106,30 @@ func (backend *JWTAuthenticationBackend) getTokenRemainingValidity(timestamp int
 }
 
 func (backend *JWTAuthenticationBackend) Logout(tokenString string, token *jwt.Token) error {
-	redisConn := redis.Connect()
 	// TODO more backend stuff
-	return redisConn.SetValue(tokenString, tokenString, backend.getTokenRemainingValidity(token.Claims.(jwt.MapClaims)["exp"]))
+	return nil
 }
 
 func (backend *JWTAuthenticationBackend) GetUser(user *models.User) []byte {
-	value := boltdbboilerplate.Get([]byte("ipaddress"), []byte(user.Username))
+	value := []byte("") //boltdbboilerplate.Get([]byte("ipaddress"), []byte(user.Username))
 	return value
 }
 
-func (backend *JWTAuthenticationBackend) RegisterUser(user *models.User) error {
+func (backend *JWTAuthenticationBackend) CreateUser(user *models.User) error {
 	// TODO this conversion may be incorrect
 	byteArray := []byte(user.Password)
 	log.Println(user.Password)
 	res, err := bcrypt.GenerateFromPassword(byteArray, 100)
 
-	err = boltdbboilerplate.Put([]byte("userpassword"), []byte(user.Username), res)
+	err = db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("userpassword"))
+		v := b.Get([]byte(user.Username))
+		if v != nil {
+			return errors.New("User already exists")
+		}
+		err := b.Put([]byte(user.Username), res)
+		return err
+	})
 	if err != nil {
 		log.Println(err)
 		return err

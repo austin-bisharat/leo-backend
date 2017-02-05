@@ -1,12 +1,12 @@
 package main
 
 import (
-	"github.com/bobintornado/boltdb-boilerplate"
 	"github.com/codegangsta/negroni"
+	"github.com/leo-backend/backend"
 	"github.com/leo-backend/routers"
 	"github.com/leo-backend/settings"
+	"log"
 	"net/http"
-    "log"
 )
 
 func main() {
@@ -17,16 +17,9 @@ func main() {
 	n := negroni.Classic()
 	n.UseHandler(router)
 
-	// Uses a boilerplate for querying boltdb
-	// Much easier to use than dealing with transactions.
-	buckets := []string{"ipaddress", "userpassword"}
-
-	err := boltdbboilerplate.InitBolt("./leoDB.db", buckets)
-	if err != nil {
-		panic("cannot open DB")
-	}
-
-	defer boltdbboilerplate.Close()
+	// Setup db and make it close on exit
+	backend.InitDB()
+	defer backend.CloseDB()
 
 	// TODO make this HTTPs
 	http.ListenAndServe(":5000", n)

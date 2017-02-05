@@ -5,14 +5,14 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 	request "github.com/dgrijalva/jwt-go/request"
 	"github.com/leo-backend/api/parameters"
-	"github.com/leo-backend/core/authentication"
+	"github.com/leo-backend/backend"
 	"github.com/leo-backend/services/models"
-	"net/http"
 	"log"
+	"net/http"
 )
 
 func Login(requestUser *models.User) (int, []byte) {
-	authBackend := authentication.InitJWTAuthenticationBackend()
+	authBackend := backend.InitJWTAuthenticationBackend()
 
 	if authBackend.Authenticate(requestUser) {
 		token, err := authBackend.GenerateToken(requestUser.UUID)
@@ -28,7 +28,7 @@ func Login(requestUser *models.User) (int, []byte) {
 }
 
 func RefreshToken(requestUser *models.User) []byte {
-	authBackend := authentication.InitJWTAuthenticationBackend()
+	authBackend := backend.InitJWTAuthenticationBackend()
 	token, err := authBackend.GenerateToken(requestUser.UUID)
 	if err != nil {
 		panic(err)
@@ -41,7 +41,7 @@ func RefreshToken(requestUser *models.User) []byte {
 }
 
 func Logout(req *http.Request) error {
-	authBackend := authentication.InitJWTAuthenticationBackend()
+	authBackend := backend.InitJWTAuthenticationBackend()
 	tokenRequest, err := request.ParseFromRequest(req, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {
 		return authBackend.PublicKey, nil
 	})
@@ -53,7 +53,7 @@ func Logout(req *http.Request) error {
 }
 
 func GetUser(requestUser *models.User) (int, []byte) {
-	authBackend := authentication.InitJWTAuthenticationBackend()
+	authBackend := backend.InitJWTAuthenticationBackend()
 	if authBackend.GetUser(requestUser) != nil {
 		// at this point we have
 		token, err := authBackend.GenerateToken(requestUser.UUID)
@@ -67,19 +67,22 @@ func GetUser(requestUser *models.User) (int, []byte) {
 	return http.StatusUnauthorized, []byte("")
 }
 
-func Register(requestUser *models.User) (int, []byte) {
-	authBackend := authentication.InitJWTAuthenticationBackend()
-	if authBackend.RegisterUser(requestUser) == nil {
-		log.Println("Successfully registered user.")
-		token, err := authBackend.GenerateToken(requestUser.UUID)
-		if err != nil {
-			return http.StatusInternalServerError, []byte("")
-		} else {
-			response, _ := json.Marshal(parameters.TokenAuthentication{token})
-			return http.StatusOK, response
-		}
-	}
-	log.Println("Could not register user.")
+func CreateUser(requestUser *models.User) (int, []byte) {
+	authBackend := backend.InitJWTAuthenticationBackend()
+	err := authBackend.CreateUser(requestUser)
 
-	return http.StatusUnauthorized, []byte("")
+	if err != nil {
+		log.Println("Could not register user.")
+		return http.StatusUnauthorized, []byte("")
+	}
+
+	token, err := authBackend.GenerateToken(requestUser.UUID)
+	if err != nil {
+		return http.StatusInternalServerError, []byte("")
+	}
+
+	response, _ := json.Marshal(parameters.TokenAuthentication{token})
+	log.Println("Successfully registered user.")
+	return http.StatusOK, response
+
 }
