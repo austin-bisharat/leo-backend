@@ -15,7 +15,6 @@ import (
 	"log"
 	"os"
 	"time"
-	"encoding/json"
 )
 
 // TODO change this all to bolt db
@@ -91,16 +90,9 @@ func (backend *JWTAuthenticationBackend) GenerateToken(userUUID string) (string,
 		return "", err
 	}
 
-	t := models.Token{tokenString, time.Now()}
-	val, err := json.Marshal(t)
-	log.Println(val)
-	if err != nil {
-		return "", err
-	}
-
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("tokens"))
-		err := b.Put([]byte(userUUID), val)
+		err := b.Put([]byte(userUUID), []byte(tokenString))
 		if err != nil {
 			return errors.New("User already exists")
 		}
@@ -134,20 +126,9 @@ func (backend *JWTAuthenticationBackend) Authenticate(user *models.User) bool {
 	
 }
 
-func (backend *JWTAuthenticationBackend) getTokenRemainingValidity(timestamp interface{}) int {
-	if validity, ok := timestamp.(float64); ok {
-		tm := time.Unix(int64(validity), 0)
-		remainer := tm.Sub(time.Now())
-		if remainer > 0 {
-			return int(remainer.Seconds() + expireOffset)
-		}
-	}
-	return expireOffset
-}
-
 func (backend *JWTAuthenticationBackend) Logout(user *models.User, tokenString string, token *jwt.Token) error {
 	// Deletes token from DB
-	// TODO remove other parems in function
+
 	err := db.Update(func(tx *bolt.Tx) error {
 		log.Println("Trying to delete token")
 		b := tx.Bucket([]byte("tokens"))
@@ -196,6 +177,42 @@ func (backend *JWTAuthenticationBackend) CreateUser(user *models.User) error {
 	log.Println("Registered user")
 	return nil
 }
+
+func RequireTokenAuthentication(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
+	authBackend := InitJWTAuthenticationBackend()
+	log.Println("Trying to verify token")
+	token, err := request.ParseFromRequest(req, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		} else {
+			return authBackend.PublicKey, nil
+		}
+	})
+	log.Println(err)
+
+	if err == nil && token.Valid {
+		var token []byte
+
+		err = db.View(func(tx *bolt.Tx) error {
+				b := tx.Bucket([]byte("tokens"))
+				v := b.Get([]byte(userUUID), []byte(tokenString))
+				if v != nil {
+					// TODO send this back to client/ client displays this.
+					return errors.New("User is not logged in. Sign in again.")
+				}
+				token = v
+				return nil
+			})
+		if token == nil || err != nil {
+			rw.WriteHeader(http.StatusUnauthorized)
+		} else {
+			next(rw, req)
+		}
+	} else {
+		rw.WriteHeader(http.StatusUnauthorized)
+	}
+}
+
 
 func getPrivateKey() *rsa.PrivateKey {
 	privateKeyFile, err := os.Open(settings.Get().PrivateKeyPath)
