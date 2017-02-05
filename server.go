@@ -3,17 +3,15 @@ package main
 import (
 	"github.com/bobintornado/boltdb-boilerplate"
 	"github.com/codegangsta/negroni"
-	"github.com/leo-backend/log"
 	"github.com/leo-backend/routers"
 	"github.com/leo-backend/settings"
 	"net/http"
+    "log"
 )
 
 func main() {
 	settings.Init()
-
-	log.InitLog()
-
+	log.Println("Starting up server.")
 	// Initializes routes and creates a negroni instance to handle them
 	router := routers.InitRoutes()
 	n := negroni.Classic()
