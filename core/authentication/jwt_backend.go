@@ -12,6 +12,7 @@ import (
 	"github.com/leo-backend/settings"
 	"golang.org/x/crypto/bcrypt"
 	"os"
+	"log"
 	"time"
 )
 
@@ -88,12 +89,15 @@ func (backend *JWTAuthenticationBackend) GetUser(user *models.User) []byte {
 func (backend *JWTAuthenticationBackend) RegisterUser(user *models.User) error {
 	// TODO this conversion may be incorrect
 	byteArray := []byte(user.Password)
+	log.Println(user.Password)
 	res, err := bcrypt.GenerateFromPassword(byteArray, 100)
 
 	err = boltdbboilerplate.Put([]byte("userpassword"), []byte(user.Username), res)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
+	log.Println("Registered user")
 	return nil
 }
 

@@ -6,9 +6,9 @@ import (
 	request "github.com/dgrijalva/jwt-go/request"
 	"github.com/leo-backend/api/parameters"
 	"github.com/leo-backend/core/authentication"
-	"github.com/leo-backend/log"
 	"github.com/leo-backend/services/models"
 	"net/http"
+	"log"
 )
 
 func Login(requestUser *models.User) (int, []byte) {
@@ -69,15 +69,17 @@ func GetUser(requestUser *models.User) (int, []byte) {
 
 func Register(requestUser *models.User) (int, []byte) {
 	authBackend := authentication.InitJWTAuthenticationBackend()
-	if authBackend.RegisterUser(requestUser) != nil {
+	if authBackend.RegisterUser(requestUser) == nil {
+		log.Println("Successfully registered user.")
 		token, err := authBackend.GenerateToken(requestUser.UUID)
 		if err != nil {
 			return http.StatusInternalServerError, []byte("")
 		} else {
-			log.Debug("here")
 			response, _ := json.Marshal(parameters.TokenAuthentication{token})
 			return http.StatusOK, response
 		}
 	}
+	log.Println("Could not register user.")
+
 	return http.StatusUnauthorized, []byte("")
 }
