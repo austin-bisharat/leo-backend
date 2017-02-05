@@ -126,24 +126,19 @@ func (backend *JWTAuthenticationBackend) Authenticate(user *models.User) bool {
 	
 }
 
-func (backend *JWTAuthenticationBackend) Logout(user *models.User, tokenString string, token *jwt.Token) error {
+func (backend *JWTAuthenticationBackend) Logout(user *models.User, tokenString string) error {
 	// Deletes token from DB
-
 	err := db.Update(func(tx *bolt.Tx) error {
 		log.Println("Trying to delete token")
 		b := tx.Bucket([]byte("tokens"))
-		err := b.Delete([]byte(user.Username))
+		err := b.Delete([]byte(user.UUID))
 		log.Println(err)
 		if err != nil {
 			return err
 		}
-		log.Println("Deleted token.")
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil;
+	return err;
 }
 
 func (backend *JWTAuthenticationBackend) GetUser(user *models.User) []byte {
@@ -178,39 +173,24 @@ func (backend *JWTAuthenticationBackend) CreateUser(user *models.User) error {
 	return nil
 }
 
-func RequireTokenAuthentication(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
-	authBackend := InitJWTAuthenticationBackend()
-	log.Println("Trying to verify token")
-	token, err := request.ParseFromRequest(req, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-		} else {
-			return authBackend.PublicKey, nil
-		}
-	})
-	log.Println(err)
+func (backend *JWTAuthenticationBackend) RequireTokenAuthentication(user *models.User, tokenString string) error {
 
-	if err == nil && token.Valid {
-		var token []byte
+	var storedToken []byte
 
-		err = db.View(func(tx *bolt.Tx) error {
-				b := tx.Bucket([]byte("tokens"))
-				v := b.Get([]byte(userUUID), []byte(tokenString))
-				if v != nil {
-					// TODO send this back to client/ client displays this.
-					return errors.New("User is not logged in. Sign in again.")
-				}
-				token = v
-				return nil
-			})
-		if token == nil || err != nil {
-			rw.WriteHeader(http.StatusUnauthorized)
-		} else {
-			next(rw, req)
-		}
-	} else {
-		rw.WriteHeader(http.StatusUnauthorized)
+	err := db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte("tokens"))
+			v := b.Get([]byte(user.UUID))
+			storedToken = v
+			return nil
+		})
+	if tokenString != string(storedToken) {
+		return fmt.Errorf("User is not logged in. Sign in again to perform that action.")
 	}
+	log.Println(storedToken)
+	if storedToken == nil || err != nil {
+		return fmt.Errorf("User is not logged in. Sign in again to perform that action.")
+	} 
+	return nil
 }
 
 
