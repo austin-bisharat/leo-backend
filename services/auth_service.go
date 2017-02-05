@@ -40,7 +40,7 @@ func RefreshToken(requestUser *models.User) []byte {
 	return response
 }
 
-func Logout(req *http.Request) error {
+func Logout(requestUser *models.User, req *http.Request) error {
 	authBackend := backend.InitJWTAuthenticationBackend()
 	tokenRequest, err := request.ParseFromRequest(req, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {
 		return authBackend.PublicKey, nil
@@ -49,7 +49,7 @@ func Logout(req *http.Request) error {
 		return err
 	}
 	tokenString := req.Header.Get("Authorization")
-	return authBackend.Logout(tokenString, tokenRequest)
+	return authBackend.Logout(requestUser, tokenString, tokenRequest)
 }
 
 func GetUser(requestUser *models.User) (int, []byte) {

@@ -19,7 +19,7 @@ func InitRoutes() *mux.Router {
 		negroni.New(
 			negroni.HandlerFunc(backend.RequireTokenAuthentication),
 			negroni.HandlerFunc(controllers.Logout),
-		)).Methods("GET")
+		)).Methods("POST")
 	router.HandleFunc("/user", controllers.GetUser).Methods("POST")
 	router.HandleFunc("/create-user", controllers.CreateUser).Methods("POST")
 	router.HandleFunc("/hello", controllers.HelloController).Methods("GET")

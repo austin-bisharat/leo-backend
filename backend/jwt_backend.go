@@ -15,6 +15,7 @@ import (
 	"log"
 	"os"
 	"time"
+	"encoding/json"
 )
 
 // TODO change this all to bolt db
@@ -49,6 +50,11 @@ func InitDB() error {
 		if err != nil {
 			return fmt.Errorf("create bucket: %s", err)
 		}
+		_, err = tx.CreateBucket([]byte("tokens")) // username => token
+		if err != nil {
+			return fmt.Errorf("create bucket: %s", err)
+		}
+		log.Println("Added tokens bucket to db")
 
 		return nil
 	})
@@ -82,6 +88,26 @@ func (backend *JWTAuthenticationBackend) GenerateToken(userUUID string) (string,
 	tokenString, err := token.SignedString(backend.privateKey)
 	if err != nil {
 		panic(err)
+		return "", err
+	}
+
+	t := models.Token{tokenString, time.Now()}
+	val, err := json.Marshal(t)
+	log.Println(val)
+	if err != nil {
+		return "", err
+	}
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("tokens"))
+		err := b.Put([]byte(userUUID), val)
+		if err != nil {
+			return errors.New("User already exists")
+		}
+		return nil
+	})
+
+	if err != nil {
 		return "", err
 	}
 	return tokenString, nil
@@ -119,9 +145,24 @@ func (backend *JWTAuthenticationBackend) getTokenRemainingValidity(timestamp int
 	return expireOffset
 }
 
-func (backend *JWTAuthenticationBackend) Logout(tokenString string, token *jwt.Token) error {
-	// TODO more backend stuff
-	return nil
+func (backend *JWTAuthenticationBackend) Logout(user *models.User, tokenString string, token *jwt.Token) error {
+	// Deletes token from DB
+	// TODO remove other parems in function
+	err := db.Update(func(tx *bolt.Tx) error {
+		log.Println("Trying to delete token")
+		b := tx.Bucket([]byte("tokens"))
+		err := b.Delete([]byte(user.Username))
+		log.Println(err)
+		if err != nil {
+			return err
+		}
+		log.Println("Deleted token.")
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil;
 }
 
 func (backend *JWTAuthenticationBackend) GetUser(user *models.User) []byte {
