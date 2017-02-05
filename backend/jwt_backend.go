@@ -89,9 +89,23 @@ func (backend *JWTAuthenticationBackend) GenerateToken(userUUID string) (string,
 
 func (backend *JWTAuthenticationBackend) Authenticate(user *models.User) bool {
 	// Obtain hashed password from DB
-	value := []byte("") //boltdbboilerplate.Get([]byte("userpassword"), []byte(user.Username))
-	// https://godoc.org/golang.org/x/crypto/bcrypt
-	return bcrypt.CompareHashAndPassword(value, []byte(user.Password)) == nil
+	var hashedPassword []byte
+	log.Println("Autheticating user.")
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("userpassword"))
+		v := b.Get([]byte(user.Username))
+		if v == nil {
+			return errors.New("User does not exist, create user first.")
+		}
+		log.Println("Obtained user!")
+		hashedPassword = v
+		return nil
+	})
+	if err != nil {
+		return false
+	}
+	return bcrypt.CompareHashAndPassword(hashedPassword, []byte(user.Password)) == nil
+	
 }
 
 func (backend *JWTAuthenticationBackend) getTokenRemainingValidity(timestamp interface{}) int {
@@ -119,11 +133,15 @@ func (backend *JWTAuthenticationBackend) CreateUser(user *models.User) error {
 	// TODO this conversion may be incorrect
 	byteArray := []byte(user.Password)
 	log.Println(user.Password)
-	res, err := bcrypt.GenerateFromPassword(byteArray, 100)
-
+	res, err := bcrypt.GenerateFromPassword(byteArray, 4)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("userpassword"))
 		v := b.Get([]byte(user.Username))
+		log.Println(v)
 		if v != nil {
 			return errors.New("User already exists")
 		}
