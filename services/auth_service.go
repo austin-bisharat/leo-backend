@@ -1,8 +1,15 @@
 package services
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha1"
+	"crypto/x509"
 	b64 "encoding/base64"
 	"encoding/json"
+	"encoding/pem"
+	"errors"
+	"fmt"
 	jwt "github.com/dgrijalva/jwt-go"
 	request "github.com/dgrijalva/jwt-go/request"
 	"github.com/leo-backend/api/parameters"
@@ -10,7 +17,6 @@ import (
 	"github.com/leo-backend/services/models"
 	"log"
 	"net/http"
-	"fmt"
 )
 
 func Login(requestUser *models.User) (int, []byte) {
@@ -62,7 +68,6 @@ func GetUser(body []byte) (int, []byte) {
 	// First, we extract the "message" field from the body
 	var f interface{}
 	err := json.Unmarshal(body, &f)
-	log.Println(string(body))
 	if err != nil {
 		return http.StatusNotFound, []byte("")
 	}
@@ -86,13 +91,102 @@ func GetUser(body []byte) (int, []byte) {
 		}
 		messageString = messageString + string(plaintext)
 	}
+
 	log.Println("==============================")
 	log.Println(messageString)
+
+	err = json.Unmarshal([]byte(messageString), &f)
+	if err != nil {
+		return http.StatusNotFound, []byte("")
+	}
+	m = f.(map[string]interface{})
+	username := m["username"].(string)
+	pubKeyString := m["pub_key"].(string)
+
+	var pubKey *rsa.PublicKey
+	pubKey, err = parsePubKey(pubKeyString)
+	if err != nil {
+		return http.StatusNotFound, []byte("")
+	}
+
+	// Replace with model
+	recipient := map[string]string{
+		"user_ip":   "000.000.000.000" + username,
+		"user_port": "1234",
+		"pub_key":   "foo",
+	}
+
+	toSign := recipient["user_ip"] + recipient["user_port"] + recipient["pub_key"]
+	var signature []byte
+	signature, err = authBackend.SignString(toSign)
+	if err != nil {
+		return http.StatusNotFound, []byte("")
+	}
+	recipient["signature"] = b64.StdEncoding.EncodeToString(signature)
+
+	var userInfo []byte
+	userInfo, err = json.Marshal(recipient)
+	if err != nil {
+		return http.StatusNotFound, []byte("")
+	}
+
+	ciphertexts := []string{}
+	messages := splitSubN(string(userInfo), 100)
+	for _, m := range messages {
+		var ciphertext []byte
+		ciphertext, err = rsa.EncryptOAEP(sha1.New(), rand.Reader,
+			pubKey, []byte(m), []byte(""))
+		if err != nil {
+			log.Println("Error encrypting")
+			log.Println(err)
+			return http.StatusNotFound, []byte("")
+		}
+		c := b64.StdEncoding.EncodeToString(ciphertext)
+		ciphertexts = append(ciphertexts, c)
+	}
+
+	messageMap := map[string][]string{
+		"message": ciphertexts,
+	}
+
+	var resp []byte
+	resp, err = json.Marshal(messageMap)
 
 	if err != nil {
 		return http.StatusNotFound, []byte("")
 	}
-	return http.StatusOK, nil
+
+	return http.StatusOK, resp
+}
+
+func splitSubN(s string, n int) []string {
+	sub := ""
+	subs := []string{}
+
+	l := len(s)
+	for i, r := range s {
+		sub = sub + string(r)
+		if (i+1)%n == 0 {
+			subs = append(subs, sub)
+			sub = ""
+		} else if (i + 1) == l {
+			subs = append(subs, sub)
+		}
+	}
+
+	return subs
+}
+
+func parsePubKey(pubKeyString string) (*rsa.PublicKey, error) {
+	block, _ := pem.Decode([]byte(pubKeyString))
+	if block == nil {
+		return nil, errors.New("Couldn't read pem")
+	}
+	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, errors.New("Couldn't read pem")
+	}
+	return pub.(*rsa.PublicKey), nil
 }
 
 func CreateUser(requestUser *models.User) (int, []byte) {
