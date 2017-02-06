@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/leo-backend/services"
 	"github.com/leo-backend/services/models"
+	"io/ioutil"
 	"net/http"
 )
 
@@ -37,16 +38,23 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(responseStatus)
 }
 
+// We expect r.body to contain a serialized JSON object of the following form:
+// { "message": "<encrypt({"username":"<username"})>" }.
+// There is an extra layer of indirection in order to more easily support changing
+// the API to do batching, which would require an array of the above objects,
+// each with a uuid field.
 func GetUser(w http.ResponseWriter, r *http.Request) {
-	// Obtains the requested user from the body
-	requestUser := new(models.User)
-	decoder := json.NewDecoder(r.Body)
-	decoder.Decode(&requestUser)
 
-	responseStatus, ip := services.GetUser(requestUser)
+	// responseBody is either an error, or a string of a json object
+	// of the following form:
+	//    { "user_ip": "<ip>", "user_pub_key": "<pem format pub key PKCS8>" }
+	body, _ := ioutil.ReadAll(r.Body)
+
+	responseStatus, responseBody := services.GetUser(body)
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(responseStatus)
-	w.Write(ip)
+	w.Write(responseBody)
 }
 
 func Update(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {

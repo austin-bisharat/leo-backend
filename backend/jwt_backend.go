@@ -2,7 +2,11 @@ package backend
 
 import (
 	"bufio"
+	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -75,6 +79,19 @@ func InitJWTAuthenticationBackend() *JWTAuthenticationBackend {
 	return authBackendInstance
 }
 
+// Given a byte array, decrypt using this backend's private key
+func (backend *JWTAuthenticationBackend) DecryptCiphertext(ciphertext []byte) ([]byte, error) {
+	return rsa.DecryptOAEP(sha1.New(), rand.Reader, backend.privateKey,
+		ciphertext, []byte(""))
+}
+
+// Given a string, sign it using private key
+func (backend *JWTAuthenticationBackend) SignString(toSign string) ([]byte, error) {
+	hashed := sha256.Sum256([]byte(toSign))
+	return rsa.SignPKCS1v15(rand.Reader, backend.privateKey,
+		crypto.SHA256, hashed[:])
+}
+
 func (backend *JWTAuthenticationBackend) GenerateToken(userUUID string) (string, error) {
 	token := jwt.New(jwt.SigningMethodRS512)
 	token.Claims = jwt.MapClaims{
@@ -123,7 +140,7 @@ func (backend *JWTAuthenticationBackend) Authenticate(user *models.User) bool {
 		return false
 	}
 	return bcrypt.CompareHashAndPassword(hashedPassword, []byte(user.Password)) == nil
-	
+
 }
 
 func (backend *JWTAuthenticationBackend) Logout(user *models.User, tokenString string) error {
@@ -138,12 +155,25 @@ func (backend *JWTAuthenticationBackend) Logout(user *models.User, tokenString s
 		}
 		return nil
 	})
-	return err;
+	return err
 }
 
-func (backend *JWTAuthenticationBackend) GetUser(user *models.User) []byte {
-	value := []byte("") //boltdbboilerplate.Get([]byte("ipaddress"), []byte(user.Username))
-	return value
+// Gets the ip and pub key for the given user
+func (backend *JWTAuthenticationBackend) GetUser(user *models.User) ([]byte, error) {
+	var value []byte
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("ipaddress"))
+		if b == nil {
+			panic("No ipaddress bucket")
+		}
+		// TODO, change this to lookup in global map. Also should validate by time
+		value = b.Get([]byte(user.Username))
+		if value == nil {
+			return errors.New("No such user")
+		}
+		return nil
+	})
+	return value, err
 }
 
 func (backend *JWTAuthenticationBackend) CreateUser(user *models.User) error {
@@ -178,21 +208,20 @@ func (backend *JWTAuthenticationBackend) RequireTokenAuthentication(user *models
 	var storedToken []byte
 
 	err := db.View(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte("tokens"))
-			v := b.Get([]byte(user.UUID))
-			storedToken = v
-			return nil
-		})
+		b := tx.Bucket([]byte("tokens"))
+		v := b.Get([]byte(user.UUID))
+		storedToken = v
+		return nil
+	})
 	if tokenString != string(storedToken) {
 		return fmt.Errorf("User is not logged in. Sign in again to perform that action.")
 	}
 	log.Println(storedToken)
 	if storedToken == nil || err != nil {
 		return fmt.Errorf("User is not logged in. Sign in again to perform that action.")
-	} 
+	}
 	return nil
 }
-
 
 func getPrivateKey() *rsa.PrivateKey {
 	privateKeyFile, err := os.Open(settings.Get().PrivateKeyPath)
