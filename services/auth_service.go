@@ -17,6 +17,7 @@ import (
 	"github.com/leo-backend/services/models"
 	"log"
 	"net/http"
+	"time"
 )
 
 func Login(requestUser *models.User) (int, []byte) {
@@ -51,7 +52,7 @@ func RefreshToken(requestUser *models.User) []byte {
 // TODO maybe add a []byte to the response
 func Logout(requestUser *models.User, req *http.Request) int {
 	authBackend := backend.InitJWTAuthenticationBackend()
-	tokenString, err := requireAuth(requestUser, req)
+	tokenString, err := requireAuth(requestUser.UUID, req)
 	if err != nil {
 		return http.StatusUnauthorized
 	}
@@ -212,8 +213,28 @@ func CreateUser(requestUser *models.User) (int, []byte) {
 	return http.StatusOK, response
 }
 
+func Register(requestIP *models.IPData, req *http.Request) (int, []byte) {
+	// First verify the user is authorized.
+	_, err := requireAuth(requestIP.UUID, req)
+	if err != nil {
+		return http.StatusUnauthorized, []byte("")
+	}
+
+	log.Println(requestIP)
+	// TODO should we require that data bve in the requestIP?
+	if requestIP.IP == ""  || requestIP.Port == "" || requestIP.PubKey == "" {
+		return http.StatusBadRequest, []byte("")
+	}
+
+	// Next, take the IPData and place it in the backend.
+	requestIP.TimeStamp = time.Now()
+	backend.Set(requestIP.UUID, requestIP)
+	// TODO figure out if we should return anything here.
+	return http.StatusOK, []byte("")
+}
+
 // private method for requiring auth
-func requireAuth(requestUser *models.User, req *http.Request) (string, error) {
+func requireAuth(UUID string, req *http.Request) (string, error) {
 	authBackend := backend.InitJWTAuthenticationBackend()
 	log.Println("Trying to verify token")
 	token, err := request.ParseFromRequest(req, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {
@@ -223,12 +244,10 @@ func requireAuth(requestUser *models.User, req *http.Request) (string, error) {
 			return authBackend.PublicKey, nil
 		}
 	})
-	log.Println("Obtained token")
-	log.Println(token.Valid)
 	if err != nil || !token.Valid {
 		return "", err
 	}
 	tokenString := req.Header.Get("Authorization")
 	log.Println("Checking if token is in db.")
-	return tokenString, authBackend.RequireTokenAuthentication(requestUser, tokenString)
+	return tokenString, authBackend.RequireTokenAuthentication(UUID, tokenString)
 }

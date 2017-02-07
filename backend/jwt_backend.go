@@ -35,7 +35,6 @@ const (
 var authBackendInstance *JWTAuthenticationBackend = nil
 
 var db *bolt.DB = nil
-
 func InitDB() error {
 	newDB, err := bolt.Open("leo.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
 	db = newDB
@@ -155,12 +154,14 @@ func (backend *JWTAuthenticationBackend) Logout(user *models.User, tokenString s
 		}
 		return nil
 	})
+	// TODO unregister the user from the timestamp_map too
 	return err
 }
 
 // Gets the ip and pub key for the given user
 func (backend *JWTAuthenticationBackend) GetUser(user *models.User) ([]byte, error) {
 	var value []byte
+	// There is no need for this bucket.
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("ipaddress"))
 		if b == nil {
@@ -203,20 +204,19 @@ func (backend *JWTAuthenticationBackend) CreateUser(user *models.User) error {
 	return nil
 }
 
-func (backend *JWTAuthenticationBackend) RequireTokenAuthentication(user *models.User, tokenString string) error {
+func (backend *JWTAuthenticationBackend) RequireTokenAuthentication(UUID string, tokenString string) error {
 
 	var storedToken []byte
 
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("tokens"))
-		v := b.Get([]byte(user.UUID))
+		v := b.Get([]byte(UUID))
 		storedToken = v
 		return nil
 	})
 	if tokenString != string(storedToken) {
 		return fmt.Errorf("User is not logged in. Sign in again to perform that action.")
 	}
-	log.Println(storedToken)
 	if storedToken == nil || err != nil {
 		return fmt.Errorf("User is not logged in. Sign in again to perform that action.")
 	}

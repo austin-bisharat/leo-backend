@@ -6,6 +6,7 @@ import (
 	"github.com/leo-backend/services/models"
 	"io/ioutil"
 	"net/http"
+	"log"
 )
 
 func Login(w http.ResponseWriter, r *http.Request) {
@@ -70,4 +71,15 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(responseStatus)
 	w.Write(token)
+}
+
+func Register(w http.ResponseWriter, r *http.Request) {
+	requestIP := new(models.IPData)
+	decoder := json.NewDecoder(r.Body)
+	decoder.Decode(&requestIP)
+
+	responseStatus, data := services.Register(requestIP, r)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(responseStatus)
+	w.Write(data)
 }
