@@ -118,7 +118,7 @@ func GetUser(body []byte) (int, []byte) {
 	recipientMap := map[string]string{
 		"user_ip":   recipient.IP,
 		"user_port": recipient.Port,
-		"pub_key":   recipient.PubKey,
+		"user_pub_key":   recipient.PubKey,
 	}
 
 	toSign := recipientMap["user_ip"] + recipientMap["user_port"] + recipientMap["pub_key"]
@@ -220,7 +220,6 @@ func Register(requestIP *models.IPData, req *http.Request) (int, []byte) {
 		return http.StatusUnauthorized, []byte("")
 	}
 
-	log.Println(requestIP)
 	// TODO should we require that data bve in the requestIP?
 	if requestIP.IP == ""  || requestIP.Port == "" || requestIP.PubKey == "" {
 		return http.StatusBadRequest, []byte("")
@@ -248,8 +247,7 @@ func requireAuth(username string, req *http.Request) (string, error) {
 		return "", err
 	}
 	tokenString := req.Header.Get("Authorization")
-	log.Println(tokenString)
-	
+
 	log.Println("Checking if token is in db.")
 	return tokenString, authBackend.RequireTokenAuthentication(username, tokenString)
 }

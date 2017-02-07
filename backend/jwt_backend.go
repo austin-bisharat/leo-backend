@@ -180,7 +180,6 @@ func (backend *JWTAuthenticationBackend) GetUser(user *models.User) ([]byte, err
 func (backend *JWTAuthenticationBackend) CreateUser(user *models.User) error {
 	// TODO this conversion may be incorrect
 	byteArray := []byte(user.Password)
-	log.Println(user.Password)
 	res, err := bcrypt.GenerateFromPassword(byteArray, 4)
 	if err != nil {
 		log.Println(err)
