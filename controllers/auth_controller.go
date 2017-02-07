@@ -71,3 +71,17 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(responseStatus)
 	w.Write(token)
 }
+
+func Register(w http.ResponseWriter, r *http.Request) {
+	requestUser := new(models.User)
+	decoder := json.NewDecoder(r.Body)
+	decoder.Decode(&requestUser)
+
+	requestIP := new(models.IPData)
+	decoder.Decode(&requestIP)
+
+	responseStatus, data := services.Register(requestUser, requestIP, r)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(responseStatus)
+	w.Write(data)
+}

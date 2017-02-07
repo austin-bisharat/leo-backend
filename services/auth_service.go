@@ -208,6 +208,24 @@ func CreateUser(requestUser *models.User) (int, []byte) {
 	return http.StatusOK, response
 }
 
+func Register(requestUser *models.User, requestIP *models.IPData, req *http.Request) (int, []byte) {
+	// First verify the user is authorized.
+	authBackend := backend.InitJWTAuthenticationBackend()
+	_, err := requireAuth(requestUser, req)
+	if err != nil {
+		return http.StatusUnauthorized, []byte("")
+	}
+	// TODO should we require that data bve in the requestIP?
+
+	// Next, take the IPData and place it in the backend.
+	err = authBackend.Register(requestUser, requestIP)
+	if err != nil {
+		return http.StatusInternalServerError, []byte("")
+	}
+	// TODO figure out if we should return anything here.
+	return http.StatusOK, []byte("")
+}
+
 // private method for requiring auth
 func requireAuth(requestUser *models.User, req *http.Request) (string, error) {
 	authBackend := backend.InitJWTAuthenticationBackend()
@@ -219,8 +237,6 @@ func requireAuth(requestUser *models.User, req *http.Request) (string, error) {
 			return authBackend.PublicKey, nil
 		}
 	})
-	log.Println("Obtained token")
-	log.Println(token.Valid)
 	if err != nil || !token.Valid {
 		return "", err
 	}
