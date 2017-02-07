@@ -1,5 +1,5 @@
 {
-  "PrivateKeyPath": "settings/keys/private.pem",
-  "PublicKeyPath": "settings/keys/public.pem",
+  "PrivateKeyPath": "/home/leomessenger/keys/private.pem",
+  "PublicKeyPath": "/home/leomessenger/keys/public.pem",
   "JWTExpirationDelta": 72
 }

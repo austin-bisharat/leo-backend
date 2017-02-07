@@ -8,9 +8,9 @@ import (
 )
 
 var environments = map[string]string{
-	"production":    "settings/prod.json",
-	"preproduction": "settings/pre.json",
-	"tests":         "../../settings/tests.json",
+	"production":    "/home/leomessenger/golang_source/src/github.com/leo-backend/settings/prod.json",
+	"preproduction": "/home/leomessenger/golang_source/src/github.com/leo-backend/settings/pre.json",
+        "tests":         "/home/leomessenger/golang_source/src/settings/tests.json",
 }
 
 type Settings struct {

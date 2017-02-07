@@ -24,5 +24,5 @@ func main() {
 	defer backend.CloseDB()
 
 	// TODO make this HTTPs
-	http.ListenAndServe(":5000", n)
+	http.ListenAndServeTLS(":5000", "/home/leomessenger/keys/cert.pem", "/home/leomessenger/keys/key.pem", n)
 }
