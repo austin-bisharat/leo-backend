@@ -20,4 +20,11 @@ go install
 go run server.go
 ```
 
+The server expects that there be files:
+```
+$HOME/golang/src/github.com/leo-backend/settings/keys/private.pem
+$HOME/golang/src/github.com/leo-backend/settings/keys/public.pem
+```
+Which must be RSA keys in PKCS8 file format.
+
 Disclaimer: All of the above might be wrong.
