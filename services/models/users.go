@@ -11,8 +11,9 @@ type User struct {
 }
 
 type IPData struct {
-	IP []byte `json:"ip"`
-	Port int `json:port`
-	PubKey []byte `json:pubkey`
-	TimeStamp time.Time `json:update-time`
+	UUID 	string 	`json:"uuid:`
+	IP 		string 	`json:"ip"`
+	Port 	string 	`json:"port"`
+	PubKey  string 	`json:"pubkey"`
+	TimeStamp time.Time `json:"update-time"`
 }

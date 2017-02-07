@@ -204,21 +204,13 @@ func (backend *JWTAuthenticationBackend) CreateUser(user *models.User) error {
 	return nil
 }
 
-func (backend *JWTAuthenticationBackend) Register(user *models.User, requestIP *models.IPData) error {
-	// put it in the mapping
-	requestIP.TimeStamp = time.Now()
-	Set(user.UUID, requestIP)
-
-	return nil
-}
-
-func (backend *JWTAuthenticationBackend) RequireTokenAuthentication(user *models.User, tokenString string) error {
+func (backend *JWTAuthenticationBackend) RequireTokenAuthentication(UUID string, tokenString string) error {
 
 	var storedToken []byte
 
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("tokens"))
-		v := b.Get([]byte(user.UUID))
+		v := b.Get([]byte(UUID))
 		storedToken = v
 		return nil
 	})
