@@ -111,22 +111,26 @@ func GetUser(body []byte) (int, []byte) {
 	}
 
 	// Replace with model
-	recipient := map[string]string{
-		"user_ip":   "000.000.000.000" + username,
-		"user_port": "1234",
-		"pub_key":   "foo",
+	recipient := backend.GetUserIP(username)
+	if recipient == nil {
+		return http.StatusNotFound, []byte("")
+	}
+	recipientMap := map[string]string{
+		"user_ip":   recipient.IP,
+		"user_port": recipient.Port,
+		"pub_key":   recipient.PubKey,
 	}
 
-	toSign := recipient["user_ip"] + recipient["user_port"] + recipient["pub_key"]
+	toSign := recipientMap["user_ip"] + recipientMap["user_port"] + recipientMap["pub_key"]
 	var signature []byte
 	signature, err = authBackend.SignString(toSign)
 	if err != nil {
 		return http.StatusNotFound, []byte("")
 	}
-	recipient["signature"] = b64.StdEncoding.EncodeToString(signature)
+	recipientMap["signature"] = b64.StdEncoding.EncodeToString(signature)
 
 	var userInfo []byte
-	userInfo, err = json.Marshal(recipient)
+	userInfo, err = json.Marshal(recipientMap)
 	if err != nil {
 		return http.StatusNotFound, []byte("")
 	}
