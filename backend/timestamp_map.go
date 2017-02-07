@@ -21,7 +21,7 @@ const (
 func GetUserIP(key string) *models.IPData {
 	lock.Lock()
 	val := m[key]
-	if time != nil && time.Now().Sub(val.TimeStamp).Minutes() > TIME_TO_PURGE {
+	if val != nil && time.Now().Sub(val.TimeStamp).Minutes() > TIME_TO_PURGE {
 		delete(m, key)
 		val = nil
 	}
