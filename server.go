@@ -19,6 +19,8 @@ func main() {
 
 	// Setup db and make it close on exit
 	backend.InitDB()
+	backend.StartPurgeEntriesTask()
+	defer backend.StopPurgeEntriesTask()
 	defer backend.CloseDB()
 
 	// TODO make this HTTPs
