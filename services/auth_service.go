@@ -24,7 +24,7 @@ func Login(requestUser *models.User) (int, []byte) {
 	authBackend := backend.InitJWTAuthenticationBackend()
 
 	if authBackend.Authenticate(requestUser) {
-		token, err := authBackend.GenerateToken(requestUser.UUID)
+		token, err := authBackend.GenerateToken(requestUser.Username)
 		if err != nil {
 			return http.StatusInternalServerError, []byte("")
 		} else {
@@ -38,7 +38,7 @@ func Login(requestUser *models.User) (int, []byte) {
 
 func RefreshToken(requestUser *models.User) []byte {
 	authBackend := backend.InitJWTAuthenticationBackend()
-	token, err := authBackend.GenerateToken(requestUser.UUID)
+	token, err := authBackend.GenerateToken(requestUser.Username)
 	if err != nil {
 		panic(err)
 	}
@@ -52,7 +52,7 @@ func RefreshToken(requestUser *models.User) []byte {
 // TODO maybe add a []byte to the response
 func Logout(requestUser *models.User, req *http.Request) int {
 	authBackend := backend.InitJWTAuthenticationBackend()
-	tokenString, err := requireAuth(requestUser.UUID, req)
+	tokenString, err := requireAuth(requestUser.Username, req)
 	if err != nil {
 		return http.StatusUnauthorized
 	}
@@ -203,7 +203,7 @@ func CreateUser(requestUser *models.User) (int, []byte) {
 		return http.StatusUnauthorized, []byte("")
 	}
 
-	token, err := authBackend.GenerateToken(requestUser.UUID)
+	token, err := authBackend.GenerateToken(requestUser.Username)
 	if err != nil {
 		return http.StatusInternalServerError, []byte("")
 	}
@@ -215,7 +215,7 @@ func CreateUser(requestUser *models.User) (int, []byte) {
 
 func Register(requestIP *models.IPData, req *http.Request) (int, []byte) {
 	// First verify the user is authorized.
-	_, err := requireAuth(requestIP.UUID, req)
+	_, err := requireAuth(requestIP.Username, req)
 	if err != nil {
 		return http.StatusUnauthorized, []byte("")
 	}
@@ -228,13 +228,13 @@ func Register(requestIP *models.IPData, req *http.Request) (int, []byte) {
 
 	// Next, take the IPData and place it in the backend.
 	requestIP.TimeStamp = time.Now()
-	backend.Set(requestIP.UUID, requestIP)
+	backend.SetUserIP(requestIP.Username, requestIP)
 	// TODO figure out if we should return anything here.
 	return http.StatusOK, []byte("")
 }
 
 // private method for requiring auth
-func requireAuth(UUID string, req *http.Request) (string, error) {
+func requireAuth(username string, req *http.Request) (string, error) {
 	authBackend := backend.InitJWTAuthenticationBackend()
 	log.Println("Trying to verify token")
 	token, err := request.ParseFromRequest(req, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {
@@ -248,6 +248,8 @@ func requireAuth(UUID string, req *http.Request) (string, error) {
 		return "", err
 	}
 	tokenString := req.Header.Get("Authorization")
+	log.Println(tokenString)
+	
 	log.Println("Checking if token is in db.")
-	return tokenString, authBackend.RequireTokenAuthentication(UUID, tokenString)
+	return tokenString, authBackend.RequireTokenAuthentication(username, tokenString)
 }

@@ -91,12 +91,12 @@ func (backend *JWTAuthenticationBackend) SignString(toSign string) ([]byte, erro
 		crypto.SHA256, hashed[:])
 }
 
-func (backend *JWTAuthenticationBackend) GenerateToken(userUUID string) (string, error) {
+func (backend *JWTAuthenticationBackend) GenerateToken(username string) (string, error) {
 	token := jwt.New(jwt.SigningMethodRS512)
 	token.Claims = jwt.MapClaims{
 		"exp": time.Now().Add(time.Hour * time.Duration(settings.Get().JWTExpirationDelta)).Unix(),
 		"iat": time.Now().Unix(),
-		"sub": userUUID,
+		"sub": username,
 	}
 
 	//
@@ -108,7 +108,7 @@ func (backend *JWTAuthenticationBackend) GenerateToken(userUUID string) (string,
 
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("tokens"))
-		err := b.Put([]byte(userUUID), []byte(tokenString))
+		err := b.Put([]byte(username), []byte(tokenString))
 		if err != nil {
 			return errors.New("User already exists")
 		}
@@ -147,7 +147,7 @@ func (backend *JWTAuthenticationBackend) Logout(user *models.User, tokenString s
 	err := db.Update(func(tx *bolt.Tx) error {
 		log.Println("Trying to delete token")
 		b := tx.Bucket([]byte("tokens"))
-		err := b.Delete([]byte(user.UUID))
+		err := b.Delete([]byte(user.Username))
 		log.Println(err)
 		if err != nil {
 			return err
@@ -204,20 +204,17 @@ func (backend *JWTAuthenticationBackend) CreateUser(user *models.User) error {
 	return nil
 }
 
-func (backend *JWTAuthenticationBackend) RequireTokenAuthentication(UUID string, tokenString string) error {
+func (backend *JWTAuthenticationBackend) RequireTokenAuthentication(username string, tokenString string) error {
 
 	var storedToken []byte
-
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("tokens"))
-		v := b.Get([]byte(UUID))
+		v := b.Get([]byte(username))
 		storedToken = v
 		return nil
 	})
-	if tokenString != string(storedToken) {
-		return fmt.Errorf("User is not logged in. Sign in again to perform that action.")
-	}
-	if storedToken == nil || err != nil {
+
+	if storedToken == nil || err != nil || tokenString != string(storedToken)  {
 		return fmt.Errorf("User is not logged in. Sign in again to perform that action.")
 	}
 	return nil

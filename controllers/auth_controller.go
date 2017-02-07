@@ -6,7 +6,6 @@ import (
 	"github.com/leo-backend/services/models"
 	"io/ioutil"
 	"net/http"
-	"log"
 )
 
 func Login(w http.ResponseWriter, r *http.Request) {

@@ -53,7 +53,7 @@ func StartPurgeEntriesTask() {
 				return
 			}
 			purgeEntries()
-			time.Sleep(PURGE_FREQUENCY * time.Millisecond)
+			time.Sleep(PURGE_FREQUENCY * time.Second)
 		}
 	}()
 }
