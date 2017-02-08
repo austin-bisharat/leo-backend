@@ -36,8 +36,9 @@ func Login(requestUser *models.User) (int, []byte) {
 	return http.StatusUnauthorized, []byte("")
 }
 
-func RefreshToken(requestUser *models.User) []byte {
+func RefreshToken(requestUser *models.User, req *http.Request) (int, []byte) {
 	authBackend := backend.InitJWTAuthenticationBackend()
+	_, err := requireAuth(requestUser.Username, req)
 	token, err := authBackend.GenerateToken(requestUser.Username)
 	if err != nil {
 		panic(err)
@@ -46,7 +47,7 @@ func RefreshToken(requestUser *models.User) []byte {
 	if err != nil {
 		panic(err)
 	}
-	return response
+	return http.StatusOK, response
 }
 
 // TODO maybe add a []byte to the response
