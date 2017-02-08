@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"github.com/boltdb/bolt"
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/leo-backend/config"
 	"github.com/leo-backend/services/models"
-	"github.com/leo-backend/settings"
 	"golang.org/x/crypto/bcrypt"
 	"log"
 	"os"
@@ -35,6 +35,7 @@ const (
 var authBackendInstance *JWTAuthenticationBackend = nil
 
 var db *bolt.DB = nil
+
 func InitDB() error {
 	newDB, err := bolt.Open("leo.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
 	db = newDB
@@ -94,7 +95,7 @@ func (backend *JWTAuthenticationBackend) SignString(toSign string) ([]byte, erro
 func (backend *JWTAuthenticationBackend) GenerateToken(username string) (string, error) {
 	token := jwt.New(jwt.SigningMethodRS512)
 	token.Claims = jwt.MapClaims{
-		"exp": time.Now().Add(time.Hour * time.Duration(settings.Get().JWTExpirationDelta)).Unix(),
+		"exp": time.Now().Add(time.Hour * time.Duration(config.JWTExpirationDelta)).Unix(),
 		"iat": time.Now().Unix(),
 		"sub": username,
 	}
@@ -213,14 +214,14 @@ func (backend *JWTAuthenticationBackend) RequireTokenAuthentication(username str
 		return nil
 	})
 
-	if storedToken == nil || err != nil || tokenString != string(storedToken)  {
+	if storedToken == nil || err != nil || tokenString != string(storedToken) {
 		return fmt.Errorf("User is not logged in. Sign in again to perform that action.")
 	}
 	return nil
 }
 
 func getPrivateKey() *rsa.PrivateKey {
-	privateKeyFile, err := os.Open(settings.Get().PrivateKeyPath)
+	privateKeyFile, err := os.Open(config.PrivateKeyPath)
 	if err != nil {
 		panic(err)
 	}
@@ -250,7 +251,7 @@ func getPrivateKey() *rsa.PrivateKey {
 }
 
 func getPublicKey() *rsa.PublicKey {
-	publicKeyFile, err := os.Open(settings.Get().PublicKeyPath)
+	publicKeyFile, err := os.Open(config.PublicKeyPath)
 	if err != nil {
 		panic(err)
 	}
