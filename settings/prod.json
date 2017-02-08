@@ -1,5 +1,0 @@
-{
-  "PrivateKeyPath": "settings/keys/private.pem",
-  "PublicKeyPath": "settings/keys/public.pem",
-  "JWTExpirationDelta": 72
-}
